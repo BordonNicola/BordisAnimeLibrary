@@ -1,0 +1,22 @@
+MY ANIME LIBRARY — guida rapida
+
+CONTENUTO
+- index.html: applicazione
+- manifest.json e icons/: installazione come PWA
+- sw.js: cache offline per la versione installata tramite un server statico
+
+COME USARLA
+Per provare subito: apri index.html con un browser moderno. Puoi aggiungere anime, stagioni, episodi e copertine. I dati vengono salvati nel localStorage del browser su quel dispositivo.
+
+IMPORTANTE SULL'INSTALLAZIONE
+Per avere l'icona installabile e il funzionamento offline affidabile come PWA, pubblica questa cartella su un hosting statico HTTPS (per esempio GitHub Pages) e apri l'indirizzo dal telefono, poi usa il menu del browser > Aggiungi a schermata Home / Installa. Il sito non usa un database remoto e non invia i dati a un server; il servizio statico distribuisce solo i file dell'app.
+La semplice apertura locale del file HTML sul telefono può avere limiti e non garantisce installazione/offline affidabile.
+
+BACKUP
+Nell'app premi Backup per scaricare un file JSON con anime, stagioni e progressi. Copialo sul PC o in un posto sicuro. Per recuperarlo, usa Importa backup. L'importazione sostituisce la libreria corrente, quindi prima esporta una copia se vuoi conservare i dati esistenti.
+
+COPERTINE
+Puoi inserire un URL immagine oppure scegliere un'immagine dal dispositivo (massimo 2 MB per immagine). Le immagini locali vengono incluse nel backup. Gli URL di copertine online richiedono connessione e possono smettere di funzionare se il sito rimuove l'immagine.
+
+PRIVACY E LIMITI
+I dati sono salvati nel browser del dispositivo, non sincronizzati. Se cancelli i dati del browser, cambi browser o reinstalli, potresti perderli: fai backup regolari. La libreria usa lo spazio locale del browser.
