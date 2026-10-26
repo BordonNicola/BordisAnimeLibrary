@@ -6,7 +6,7 @@ CONTENUTO
 - sw.js: cache offline per la versione installata tramite un server statico
 
 COME USARLA
-Per provare subito: apri index.html con un browser moderno. Puoi aggiungere anime, stagioni, episodi e copertine. I dati vengono salvati nel localStorage del browser su quel dispositivo.
+Per provare subito: apri index.html con un browser moderno. Puoi aggiungere anime, stagioni, episodi e copertine. I dati vengono salvati nel database del browser (IndexedDB) su quel dispositivo; i dati salvati con le versioni precedenti vengono spostati automaticamente al primo avvio.
 
 IMPORTANTE SULL'INSTALLAZIONE
 Per avere l'icona installabile e il funzionamento offline affidabile come PWA, pubblica questa cartella su un hosting statico HTTPS (per esempio GitHub Pages) e apri l'indirizzo dal telefono, poi usa il menu del browser > Aggiungi a schermata Home / Installa. Il sito non usa un database remoto e non invia i dati a un server; il servizio statico distribuisce solo i file dell'app.

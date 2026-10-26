@@ -69,8 +69,49 @@ let activeStatus='Tutti';
 let editCoverData=null;
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');items=Array.isArray(x)?x:[]}catch{items=[]}}
-function save(){localStorage.setItem(KEY,JSON.stringify(items));render()}
+const DB_NAME='myAnimeLibraryDB';
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function idbGet(k){const db=await idbOpen();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbSet(k,v){const db=await idbOpen();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)})}
+async function load(){
+ let stored;
+ try{stored=await idbGet('items')}catch{stored=undefined}
+ if(Array.isArray(stored)){items=stored;return}
+ try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');items=Array.isArray(x)?x:[]}catch{items=[]}
+ if(items.length&&await save()){try{localStorage.removeItem(KEY)}catch{}}
+}
+async function init(){
+ await load();render();
+ if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+ shrinkStoredCovers();
+}
+async function save(){
+ try{await idbSet('items',items);render();return true}
+ catch(err){render();alert('Impossibile salvare sul dispositivo (spazio esaurito o archiviazione bloccata dal browser). Scarica subito un backup.');return false}
+}
+function compressImage(src,max=480,quality=0.8){
+ return new Promise(resolve=>{
+  const img=new Image();
+  img.onload=()=>{
+   const k=Math.min(1,max/Math.max(img.width,img.height));
+   const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*k));c.height=Math.max(1,Math.round(img.height*k));
+   const ctx=c.getContext('2d');ctx.fillStyle='#11111b';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
+   resolve(c.toDataURL('image/jpeg',quality));
+  };
+  img.onerror=()=>resolve(src);
+  img.src=src;
+ });
+}
+async function shrinkStoredCovers(){
+ let changed=false;
+ for(const a of items){
+  if(a.coverData&&a.coverData.length>120000){
+   const small=await compressImage(a.coverData);
+   if(small.length<a.coverData.length){a.coverData=small;changed=true}
+  }
+ }
+ if(changed)save();
+}
 function episodesSeen(a){return (a.seasons||[]).reduce((n,s)=>n+Math.min(Number(s.seen)||0,Number(s.total)||0),0)}
 function episodesTotal(a){return (a.seasons||[]).reduce((n,s)=>n+(Number(s.total)||0),0)}
 function progress(a){let t=episodesTotal(a);return t?Math.min(1,episodesSeen(a)/t):0}
@@ -116,14 +157,17 @@ $('animeForm').addEventListener('submit',async e=>{
  const file=$('coverFile').files[0];
  if(file){
   if(file.size>2*1024*1024){alert('Questa immagine supera 2 MB. Scegli una versione più piccola per non riempire la memoria locale.');return}
-  editCoverData=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)})
+  const raw=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)});
+  editCoverData=await compressImage(raw);
  }
  const status=$('status').value;
  const a={id,title:$('title').value.trim(),status,rating:$('rating').value===''?'':Number($('rating').value),coverUrl:$('cover').value.trim(),coverData:editCoverData||null,startDate:$('startDate').value,endDate:$('endDate').value,notes:$('notes').value.trim(),seasons:getSeasons(),updated:Date.now()};
  if(status==='Completato'&&!a.endDate)a.endDate=new Date().toISOString().slice(0,10);
  if(status!=='Completato')a.endDate=$('endDate').value;
- if(old)items=items.map(x=>x.id===id?a:x);else items.push(a);
- save();$('animeDialog').close();$('coverFile').value='';
+ const backup=items;
+ items=old?items.map(x=>x.id===id?a:x):[...items,a];
+ if(!(await save())){items=backup;render();return}
+ $('animeDialog').close();$('coverFile').value='';
 });
 $('deleteAnime').onclick=()=>{const id=$('animeId').value;const a=items.find(x=>x.id===id);if(a&&confirm(`Eliminare "${a.title}" dalla libreria?`)){items=items.filter(x=>x.id!==id);save();$('animeDialog').close()}};
 $('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-status]');if(!b)return;activeStatus=b.dataset.status;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));render()});
@@ -141,12 +185,12 @@ $('importFile').addEventListener('change',async e=>{
   const d=JSON.parse(await f.text());const incoming=Array.isArray(d)?d:d.items;
   if(!Array.isArray(incoming))throw Error('Formato non riconosciuto');
   if(!confirm(`Il backup contiene ${incoming.length} anime. Vuoi sostituire la libreria attuale (${items.length} anime)? Esporta prima un backup se vuoi conservare entrambi.`))return;
-  items=incoming;save();alert('Backup importato correttamente.');
+  items=incoming;if(await save())alert('Backup importato correttamente.');
  }catch(err){alert('Impossibile importare il backup. Controlla che sia un file JSON valido.')}
  finally{e.target.value=''}
 });
 if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
-load();render();
+init();
 </script>
 </body>
 </html>
